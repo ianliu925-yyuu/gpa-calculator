@@ -39,6 +39,9 @@ td.del{width:40px;text-align:center}
 .col-credit,.col-score{width:90px}
 button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;padding:8px 14px;cursor:pointer}
 button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+label.btn{display:inline-block;font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+label.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+progress{width:100%;height:8px;margin-top:10px;accent-color:var(--accent)}
 button.icon{padding:4px 8px;color:var(--danger);border-color:transparent;background:transparent;font-size:1.1rem}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
 .results{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
@@ -118,7 +121,19 @@ footer{margin-top:28px;color:var(--muted);font-size:.85rem;text-align:center}
 </div>
 
 <section class="card no-print">
-  <details>
+  <h2>📷 拍成績單自動填入</h2>
+  <p class="muted">上傳或拍一張成績單照片，系統會自動辨識課名、學分和分數。辨識在你的手機或電腦上進行，照片不會上傳。第一次使用需要下載約 10 MB 的中文辨識資料。</p>
+  <div class="row">
+    <label class="btn primary" for="photo">選擇照片</label>
+    <input type="file" id="photo" accept="image/*" hidden>
+    <span class="msg" id="ocrMsg"></span>
+  </div>
+  <progress id="ocrProg" max="1" value="0" hidden></progress>
+  <p class="muted">小技巧：照片拍正、光線充足、只拍成績表格的部分，辨識會比較準。辨識結果會放進下方的文字框，請檢查後再按「加入表格」。</p>
+</section>
+
+<section class="card no-print">
+  <details id="bulkBox">
     <summary>從成績單一次貼上多科</summary>
     <p class="muted">每行一科，格式為「課程名稱 學分 分數」，用空白、Tab 或逗號分隔皆可。可直接從 Excel 或學校成績系統複製。</p>
     <textarea id="bulk" placeholder="微積分 3 85&#10;線性代數 3 78&#10;普通物理 4 72"></textarea>
@@ -145,7 +160,7 @@ footer{margin-top:28px;color:var(--muted);font-size:.85rem;text-align:center}
   <details><summary>加權平均和 GPA 有什麼不同？</summary>
   <p>加權平均是用原始分數乘上學分再平均，GPA 則是先把分數轉成等第的績點再平均。同樣的加權平均，換算出的 GPA 會因標準不同而差很多，例如 80 分在台灣常用 4.0 制是 4.0，在 4.3 制是 3.7。</p></details>
   <details><summary>我的資料安全嗎？</summary>
-  <p>所有計算都在你的瀏覽器裡完成，成績只存在你自己的裝置上，不會傳到任何伺服器。</p></details>
+  <p>所有計算和照片辨識都在你的瀏覽器裡完成，成績和照片只存在你自己的裝置上，不會傳到任何伺服器。</p></details>
 </section>
 
 <footer>換算結果僅供參考，請以各校官方規定為準。</footer>
@@ -282,6 +297,81 @@ $("scaleTables").innerHTML=Object.values(SCALES).map(s=>{
     return `<tr><td>${r[2]}</td><td>${r[0]}–${hi}</td><td>${r[1].toFixed(1)}</td></tr>`;}).join("");
   return `<div><strong>${s.name}</strong><table class="scale-table"><thead><tr><th>等第</th><th>分數</th><th>績點</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }).join("");
+
+function parseTranscript(text){
+  const SKIP=/平均|總計|合計|小計|排名|名次|GPA|學分數|實得|修習|操行|學號|姓名|系所|班級|頁/i;
+  const out=[];
+  for(let line of text.split(/\r?\n/)){
+    line=line.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/[．。]/g,".").replace(/[|｜_]/g," ").replace(/(?<=\d)[OoＯ]|[OoＯ](?=\d)/g,"0");
+    const names=(line.match(/[㐀-鿿A-Za-z][㐀-鿿A-Za-z（）()·．\-\s]*[㐀-鿿A-Za-z）)]|[㐀-鿿]/g)||[])
+      .map(s=>s.trim()).filter(s=>/[㐀-鿿]/.test(s)||s.replace(/\s/g,"").length>=3);
+    if(!names.length)continue;
+    const name=names.sort((a,b)=>b.length-a.length)[0].replace(/^(必修?|選修?|通識)\s*|\s*(必修?|選修?|通識)$/g,"").trim();
+    if(!name||SKIP.test(name))continue;
+    const nums=[...line.matchAll(/\d+(?:\.\d+)?/g)].map(m=>parseFloat(m[0])).filter(v=>v<=100);
+    if(nums.length<2)continue;
+    let si=nums.length-1,score=nums[si];
+    let ci=-1;
+    for(let k=si-1;k>=0;k--){if(nums[k]>0&&nums[k]<=6){ci=k;break;}}
+    let credit;
+    if(ci>=0&&score>6){credit=nums[ci];}
+    else if(score<=6&&score>0){
+      let k2=-1;for(let k=si-1;k>=0;k--){if(nums[k]>6){k2=k;break;}}
+      if(k2<0)continue;credit=score;score=nums[k2];
+    }else continue;
+    out.push({name,credit:String(credit),score:String(score)});
+  }
+  return out;
+}
+
+let ocrWorker=null;
+function loadScript(src){return new Promise((res,rej)=>{const sc=document.createElement("script");sc.src=src;sc.onload=res;sc.onerror=()=>rej(new Error("load"));document.head.appendChild(sc);});}
+function prepImage(file){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const scale=img.width<1600?Math.min(2.5,1600/img.width):Math.min(1,3000/img.width);
+      const c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+      const g=c.getContext("2d");g.drawImage(img,0,0,c.width,c.height);
+      const d=g.getImageData(0,0,c.width,c.height),a=d.data;
+      for(let i=0;i<a.length;i+=4){const y=0.299*a[i]+0.587*a[i+1]+0.114*a[i+2];a[i]=a[i+1]=a[i+2]=y;}
+      g.putImageData(d,0,0);URL.revokeObjectURL(img.src);res(c);
+    };
+    img.onerror=()=>rej(new Error("image"));
+    img.src=URL.createObjectURL(file);
+  });
+}
+$("photo").onchange=async e=>{
+  const file=e.target.files[0];e.target.value="";if(!file)return;
+  const m=$("ocrMsg"),prog=$("ocrProg");
+  m.className="msg";prog.hidden=false;prog.value=0;
+  try{
+    if(!window.Tesseract){m.textContent="載入辨識工具中…";await loadScript("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js");}
+    if(!ocrWorker){
+      m.textContent="下載中文辨識資料中（只有第一次）…";
+      ocrWorker=await Tesseract.createWorker(["chi_tra","eng"],1,{logger:x=>{
+        if(x.status==="recognizing text"){prog.value=x.progress;m.textContent="辨識中… "+Math.round(x.progress*100)+"%";}
+        else if(typeof x.progress==="number"&&/load/.test(x.status)){prog.value=x.progress;}
+      }});
+    }
+    m.textContent="辨識中…";
+    const canvas=await prepImage(file);
+    const {data:{text}}=await ocrWorker.recognize(canvas);
+    const rows=parseTranscript(text);
+    $("bulkBox").open=true;
+    if(rows.length){
+      $("bulk").value=rows.map(r=>`${r.name} ${r.credit} ${r.score}`).join("\n");
+      m.className="msg ok";m.textContent=`辨識出 ${rows.length} 科，請在下方檢查並修正後按「加入表格」`;
+    }else{
+      $("bulk").value=text.trim();
+      m.className="msg err";m.textContent="沒有自動抓到科目，已把辨識出的文字放到下方，請手動整理成「課名 學分 分數」";
+    }
+    $("bulkBox").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(err){
+    m.className="msg err";
+    m.textContent=err.message==="image"?"無法讀取這張圖片，請換成 JPG 或 PNG":"辨識失敗，請確認網路連線後再試一次";
+  }finally{prog.hidden=true;}
+};
 
 load();render();
 </script>
