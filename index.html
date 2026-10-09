@@ -205,7 +205,7 @@ function render(){
   compute();
 }
 
-function fmt(x,d){return x.toFixed(d);}
+function fmt(x,d){const m=Math.pow(10,d);return (Math.round(x*m+1e-9)/m).toFixed(d);}
 function compute(){
   const show=$("showScale").value;
   $("gradeHead").textContent=SCALES[show].name.replace(" 等第制"," 等第").replace("4.0 台灣常用","4.0 等第").replace("4.0 美式","美式等第");
