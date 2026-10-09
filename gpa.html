@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPA 換算器｜台灣成績百分制轉 4.0 / 4.3 GPA</title>
+<meta name="description" content="免費 GPA 換算器：輸入台灣大學百分制成績與學分，一鍵算出加權平均、4.0 與 4.3 制 GPA。申請研究所、交換、留學都適用，資料只存在你的瀏覽器。">
+<meta name="keywords" content="GPA換算, GPA計算, 4.3 GPA, 4.0 GPA, 百分制轉GPA, 加權平均, 留學, 交換, 研究所申請">
+<meta property="og:title" content="GPA 換算器｜台灣成績百分制轉 4.0 / 4.3 GPA">
+<meta property="og:description" content="輸入成績與學分，一鍵算出加權平均與 4.0 / 4.3 制 GPA。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+<!-- Google AdSense：審核通過後把 ca-pub-XXXXXXXXXXXXXXXX 換成你的發布商 ID，並取消下一行的註解 -->
+<!-- <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script> -->
+<style>
+:root{
+  --bg:#f6f7fb;--card:#ffffff;--text:#1d2433;--muted:#5d667a;--line:#e3e6ee;
+  --accent:#2f6fed;--accent-soft:#e8f0ff;--danger:#d64545;--ok:#1f9d6b;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#12151c;--card:#1b2029;--text:#e7eaf1;--muted:#9aa3b5;--line:#2c3340;
+  --accent:#6d9bff;--accent-soft:#1f2a42;--danger:#ff7b7b;--ok:#4cd39b;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;line-height:1.6}
+.wrap{max-width:880px;margin:0 auto;padding:24px 16px 48px}
+header h1{font-size:1.7rem;margin:0 0 4px}
+header p{margin:0;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-top:18px}
+h2{font-size:1.15rem;margin:0 0 12px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:6px 4px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-size:.85rem;color:var(--muted);font-weight:600}
+td input{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text);font-size:1rem}
+td input:focus,textarea:focus,select:focus{outline:2px solid var(--accent);outline-offset:0}
+td.grade{text-align:center;font-weight:600;white-space:nowrap;width:64px}
+td.del{width:40px;text-align:center}
+.col-credit,.col-score{width:90px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;padding:8px 14px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.icon{padding:4px 8px;color:var(--danger);border-color:transparent;background:transparent;font-size:1.1rem}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.results{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.stat{background:var(--accent-soft);border-radius:12px;padding:14px}
+.stat .label{font-size:.85rem;color:var(--muted)}
+.stat .value{font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+.stat .sub{font-size:.8rem;color:var(--muted)}
+textarea{width:100%;min-height:110px;padding:10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:.95rem}
+select{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)}
+details summary{cursor:pointer;font-weight:600}
+.scale-table{font-size:.9rem}
+.scale-table td,.scale-table th{padding:4px 8px}
+.scales{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.muted{color:var(--muted);font-size:.9rem}
+.ad-slot{margin-top:18px;min-height:0}
+.msg{font-size:.9rem;margin-left:4px}
+.msg.err{color:var(--danger)}.msg.ok{color:var(--ok)}
+footer{margin-top:28px;color:var(--muted);font-size:.85rem;text-align:center}
+@media (max-width:560px){
+  .col-credit,.col-score{width:64px}
+  td.grade{width:44px}
+  td input{padding:6px;font-size:.95rem}
+  header h1{font-size:1.4rem}
+}
+@media print{.no-print{display:none!important}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>🎓 GPA 換算器</h1>
+  <p>輸入台灣大學的百分制成績與學分，立即算出加權平均、4.0 制與 4.3 制 GPA。資料只存在你的瀏覽器，不會上傳。</p>
+</header>
+
+<section class="card">
+  <h2>你的成績</h2>
+  <table>
+    <thead><tr><th>課程名稱</th><th class="col-credit">學分</th><th class="col-score">分數</th><th id="gradeHead">4.3 等第</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="row no-print">
+    <button class="primary" id="addBtn">＋ 新增一科</button>
+    <button id="sampleBtn">填入範例</button>
+    <button id="clearBtn">全部清除</button>
+    <label class="muted">表格顯示：
+      <select id="showScale">
+        <option value="ntu43">4.3 等第</option>
+        <option value="tw40">4.0 台灣常用</option>
+        <option value="us40">4.0 美式</option>
+      </select>
+    </label>
+  </div>
+</section>
+
+<section class="card">
+  <h2>計算結果</h2>
+  <div class="results">
+    <div class="stat"><div class="label">加權平均（百分制）</div><div class="value" id="rAvg">–</div><div class="sub" id="rCredits">總學分 0</div></div>
+    <div class="stat"><div class="label">GPA（4.3 等第制）</div><div class="value" id="rNtu">–</div><div class="sub">台灣多數大學現行等第制</div></div>
+    <div class="stat"><div class="label">GPA（4.0 台灣常用）</div><div class="value" id="rTw">–</div><div class="sub">80 分以上 = 4.0</div></div>
+    <div class="stat"><div class="label">GPA（4.0 美式）</div><div class="value" id="rUs">–</div><div class="sub">93 分以上 = 4.0</div></div>
+  </div>
+  <div class="row no-print">
+    <button id="csvBtn">下載 CSV</button>
+    <button id="printBtn">列印 / 存成 PDF</button>
+    <button id="shareBtn">複製結果</button>
+    <span class="msg" id="shareMsg"></span>
+  </div>
+</section>
+
+<!-- 廣告位置：AdSense 通過後把下面的 ins 區塊取消註解 -->
+<div class="ad-slot no-print">
+  <!--
+  <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="XXXXXXXXXX" data-ad-format="auto" data-full-width-responsive="true"></ins>
+  <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  -->
+</div>
+
+<section class="card no-print">
+  <details>
+    <summary>從成績單一次貼上多科</summary>
+    <p class="muted">每行一科，格式為「課程名稱 學分 分數」，用空白、Tab 或逗號分隔皆可。可直接從 Excel 或學校成績系統複製。</p>
+    <textarea id="bulk" placeholder="微積分 3 85&#10;線性代數 3 78&#10;普通物理 4 72"></textarea>
+    <div class="row">
+      <button class="primary" id="importBtn">加入表格</button>
+      <label class="muted"><input type="checkbox" id="replaceChk"> 取代現有資料</label>
+      <span class="msg" id="importMsg"></span>
+    </div>
+  </details>
+</section>
+
+<section class="card">
+  <h2>換算標準</h2>
+  <div class="scales" id="scaleTables"></div>
+  <p class="muted">計算方式：GPA = Σ（各科學分 × 該科績點）÷ 總學分。各校及各申請單位的標準可能不同，正式申請請以學校成績單或官方換算為準。</p>
+</section>
+
+<section class="card">
+  <h2>常見問題</h2>
+  <details><summary>申請國外研究所該用 4.0 還是 4.3？</summary>
+  <p>美國學校多採 4.0 制。如果你的學校成績單已經用 4.3 等第制，通常直接附上成績單並註明滿分是 4.3 即可；若對方要求 4.0 制，可參考上面兩種 4.0 換算，或使用 WES 等認證機構的換算結果。</p></details>
+  <details><summary>不及格的科目要算進去嗎？</summary>
+  <p>大部分的 GPA 計算會把不及格科目算進去（績點為 0），所以這個工具也會計入。若是通過/不通過制的課程，請不要輸入。</p></details>
+  <details><summary>加權平均和 GPA 有什麼不同？</summary>
+  <p>加權平均是用原始分數乘上學分再平均，GPA 則是先把分數轉成等第的績點再平均。同樣的加權平均，換算出的 GPA 會因標準不同而差很多，例如 80 分在台灣常用 4.0 制是 4.0，在 4.3 制是 3.7。</p></details>
+  <details><summary>我的資料安全嗎？</summary>
+  <p>所有計算都在你的瀏覽器裡完成，成績只存在你自己的裝置上，不會傳到任何伺服器。</p></details>
+</section>
+
+<footer>換算結果僅供參考，請以各校官方規定為準。</footer>
+</div>
+
+<script>
+const SCALES={
+  ntu43:{name:"4.3 等第制",rows:[[90,4.3,"A+"],[85,4.0,"A"],[80,3.7,"A-"],[77,3.3,"B+"],[73,3.0,"B"],[70,2.7,"B-"],[67,2.3,"C+"],[63,2.0,"C"],[60,1.7,"C-"],[0,0,"F"]]},
+  tw40:{name:"4.0 台灣常用",rows:[[80,4,"A"],[70,3,"B"],[60,2,"C"],[50,1,"D"],[0,0,"E"]]},
+  us40:{name:"4.0 美式",rows:[[93,4.0,"A"],[90,3.7,"A-"],[87,3.3,"B+"],[83,3.0,"B"],[80,2.7,"B-"],[77,2.3,"C+"],[73,2.0,"C"],[70,1.7,"C-"],[67,1.3,"D+"],[63,1.0,"D"],[60,0.7,"D-"],[0,0,"F"]]}
+};
+const KEY="gpa-calc-v1";
+const $=id=>document.getElementById(id);
+let courses=[];
+
+function lookup(scale,score){
+  for(const r of SCALES[scale].rows){if(score>=r[0])return r;}
+  return SCALES[scale].rows[SCALES[scale].rows.length-1];
+}
+function valid(c){
+  const cr=parseFloat(c.credit),sc=parseFloat(c.score);
+  return isFinite(cr)&&cr>0&&isFinite(sc)&&sc>=0&&sc<=100;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({courses,show:$("showScale").value}));}catch(e){}}
+function load(){
+  try{const d=JSON.parse(localStorage.getItem(KEY));
+    if(d&&Array.isArray(d.courses)){courses=d.courses;if(d.show&&SCALES[d.show])$("showScale").value=d.show;}
+  }catch(e){}
+  if(!courses.length)courses=[{name:"",credit:"",score:""},{name:"",credit:"",score:""},{name:"",credit:"",score:""}];
+}
+function esc(s){return String(s).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));}
+
+function render(){
+  const tb=$("rows");
+  tb.innerHTML=courses.map((c,i)=>`<tr>
+    <td><input data-i="${i}" data-k="name" value="${esc(c.name)}" placeholder="例：微積分" aria-label="課程名稱"></td>
+    <td class="col-credit"><input data-i="${i}" data-k="credit" value="${esc(c.credit)}" inputmode="decimal" placeholder="3" aria-label="學分"></td>
+    <td class="col-score"><input data-i="${i}" data-k="score" value="${esc(c.score)}" inputmode="decimal" placeholder="85" aria-label="分數"></td>
+    <td class="grade" id="g${i}"></td>
+    <td class="del no-print"><button class="icon" data-del="${i}" aria-label="刪除">✕</button></td>
+  </tr>`).join("");
+  compute();
+}
+
+function fmt(x,d){return x.toFixed(d);}
+function compute(){
+  const show=$("showScale").value;
+  $("gradeHead").textContent=SCALES[show].name.replace(" 等第制"," 等第").replace("4.0 台灣常用","4.0 等第").replace("4.0 美式","美式等第");
+  let tc=0,ws=0,g={ntu43:0,tw40:0,us40:0};
+  courses.forEach((c,i)=>{
+    const cell=$("g"+i);
+    if(!valid(c)){
+      cell.textContent=(c.credit!==""||c.score!=="")?"⚠":"";
+      cell.title=(c.credit!==""||c.score!=="")?"學分需大於 0，分數需在 0 到 100 之間":"";
+      return;
+    }
+    const cr=parseFloat(c.credit),sc=parseFloat(c.score);
+    tc+=cr;ws+=cr*sc;
+    for(const k in g)g[k]+=cr*lookup(k,sc)[1];
+    const r=lookup(show,sc);cell.textContent=r[2];cell.title=r[1]+" 績點";
+  });
+  if(tc>0){
+    $("rAvg").textContent=fmt(ws/tc,2);
+    $("rNtu").textContent=fmt(g.ntu43/tc,2);
+    $("rTw").textContent=fmt(g.tw40/tc,2);
+    $("rUs").textContent=fmt(g.us40/tc,2);
+  }else{["rAvg","rNtu","rTw","rUs"].forEach(id=>$(id).textContent="–");}
+  $("rCredits").textContent="總學分 "+(Math.round(tc*100)/100);
+  save();
+  return {tc,avg:tc?ws/tc:0,g};
+}
+
+$("rows").addEventListener("input",e=>{
+  const t=e.target;if(t.dataset.i===undefined)return;
+  courses[+t.dataset.i][t.dataset.k]=t.value.trim()===""?"":t.value;
+  compute();
+});
+$("rows").addEventListener("click",e=>{
+  const b=e.target.closest("[data-del]");if(!b)return;
+  courses.splice(+b.dataset.del,1);
+  if(!courses.length)courses.push({name:"",credit:"",score:""});
+  render();
+});
+$("addBtn").onclick=()=>{courses.push({name:"",credit:"",score:""});render();
+  const ins=$("rows").querySelectorAll("tr:last-child input");if(ins[0])ins[0].focus();};
+$("sampleBtn").onclick=()=>{courses=[
+  {name:"微積分",credit:"3",score:"88"},{name:"線性代數",credit:"3",score:"79"},
+  {name:"普通物理",credit:"3",score:"72"},{name:"程式設計",credit:"3",score:"93"},
+  {name:"英文",credit:"2",score:"85"},{name:"體育",credit:"1",score:"90"}];render();};
+$("clearBtn").onclick=()=>{if(confirm("確定要清除所有成績嗎？")){courses=[{name:"",credit:"",score:""}];render();}};
+$("showScale").onchange=compute;
+
+$("importBtn").onclick=()=>{
+  const lines=$("bulk").value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const added=[];let bad=0;
+  for(const line of lines){
+    const parts=line.split(/[\s,，\t]+/).filter(Boolean);
+    if(parts.length<2){bad++;continue;}
+    const score=parts[parts.length-1],credit=parts[parts.length-2];
+    const name=parts.slice(0,-2).join(" ");
+    const c={name,credit,score};
+    if(valid(c))added.push(c);else bad++;
+  }
+  const m=$("importMsg");
+  if(!added.length){m.className="msg err";m.textContent="沒有讀到可用的資料，請確認每行最後兩欄是學分和分數。";return;}
+  const keep=$("replaceChk").checked?[]:courses.filter(c=>c.name||c.credit!==""||c.score!=="");
+  courses=keep.concat(added);render();
+  m.className="msg ok";m.textContent=`已加入 ${added.length} 科`+(bad?`，略過 ${bad} 行格式不符`:"");
+  $("bulk").value="";
+};
+
+function csvCell(s){s=String(s);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}
+$("csvBtn").onclick=()=>{
+  const r=compute();
+  const out=[["課程名稱","學分","分數","4.3等第","4.3績點","4.0台灣","4.0美式"]];
+  courses.filter(valid).forEach(c=>{const sc=parseFloat(c.score);
+    out.push([c.name,c.credit,c.score,lookup("ntu43",sc)[2],lookup("ntu43",sc)[1],lookup("tw40",sc)[1],lookup("us40",sc)[1]]);});
+  if(r.tc)out.push(["總計",r.tc,fmt(r.avg,2),"",fmt(r.g.ntu43/r.tc,2),fmt(r.g.tw40/r.tc,2),fmt(r.g.us40/r.tc,2)]);
+  const blob=new Blob(["﻿"+out.map(row=>row.map(csvCell).join(",")).join("\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="gpa.csv";a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+$("printBtn").onclick=()=>window.print();
+$("shareBtn").onclick=async()=>{
+  const r=compute();const m=$("shareMsg");
+  if(!r.tc){m.className="msg err";m.textContent="請先輸入成績";return;}
+  const txt=`我的成績：加權平均 ${fmt(r.avg,2)}，GPA ${fmt(r.g.ntu43/r.tc,2)}/4.3，${fmt(r.g.tw40/r.tc,2)}/4.0（台灣），${fmt(r.g.us40/r.tc,2)}/4.0（美式）｜用 GPA 換算器算的：${location.href}`;
+  try{await navigator.clipboard.writeText(txt);m.className="msg ok";m.textContent="已複製";}
+  catch(e){m.className="msg err";m.textContent="無法複製，請手動選取";}
+};
+
+$("scaleTables").innerHTML=Object.values(SCALES).map(s=>{
+  const rows=s.rows.map((r,i)=>{const hi=i===0?100:s.rows[i-1][0]-1;
+    return `<tr><td>${r[2]}</td><td>${r[0]}–${hi}</td><td>${r[1].toFixed(1)}</td></tr>`;}).join("");
+  return `<div><strong>${s.name}</strong><table class="scale-table"><thead><tr><th>等第</th><th>分數</th><th>績點</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}).join("");
+
+load();render();
+</script>
+</body>
+</html>
