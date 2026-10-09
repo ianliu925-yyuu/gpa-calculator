@@ -302,12 +302,14 @@ function parseTranscript(text){
   const SKIP=/平均|總計|合計|小計|排名|名次|GPA|學分數|實得|修習|操行|學號|姓名|系所|班級|頁/i;
   const out=[];
   for(let line of text.split(/\r?\n/)){
-    line=line.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/[．。]/g,".").replace(/[|｜_]/g," ").replace(/(?<=\d)[OoＯ]|[OoＯ](?=\d)/g,"0");
+    line=line.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/[．。]/g,".").replace(/[|｜_]/g," ").replace(/(?<=\d)[OoＯ]|[OoＯ](?=\d)/g,"0").replace(/(?<=\d)[lI|]|[lI](?=\d)/g,"1").replace(/[^\u3400-\u9fffA-Za-z0-9.\s()（）\-·]/g," ").replace(/\s+/g," ");
     const names=(line.match(/[㐀-鿿A-Za-z][㐀-鿿A-Za-z（）()·．\-\s]*[㐀-鿿A-Za-z）)]|[㐀-鿿]/g)||[])
       .map(s=>s.trim()).filter(s=>/[㐀-鿿]/.test(s)||s.replace(/\s/g,"").length>=3);
     if(!names.length)continue;
     const name=names.sort((a,b)=>b.length-a.length)[0].replace(/^(必修?|選修?|通識)\s*|\s*(必修?|選修?|通識)$/g,"").trim();
     if(!name||SKIP.test(name))continue;
+    const cjk=(name.match(/[\u3400-\u9fff]/g)||[]).length,lat=(name.match(/[A-Za-z]/g)||[]).length;
+    if(cjk<2&&lat<3)continue;
     const nums=[...line.matchAll(/\d+(?:\.\d+)?/g)].map(m=>parseFloat(m[0])).filter(v=>v<=100);
     if(nums.length<2)continue;
     let si=nums.length-1,score=nums[si];
@@ -319,6 +321,7 @@ function parseTranscript(text){
       let k2=-1;for(let k=si-1;k>=0;k--){if(nums[k]>6){k2=k;break;}}
       if(k2<0)continue;credit=score;score=nums[k2];
     }else continue;
+    if(Math.abs(credit*2-Math.round(credit*2))>1e-9)continue;
     out.push({name,credit:String(credit),score:String(score)});
   }
   return out;
@@ -326,20 +329,58 @@ function parseTranscript(text){
 
 let ocrWorker=null;
 function loadScript(src){return new Promise((res,rej)=>{const sc=document.createElement("script");sc.src=src;sc.onload=res;sc.onerror=()=>rej(new Error("load"));document.head.appendChild(sc);});}
+function cleanImage(c){
+  const g=c.getContext("2d"),w=c.width,h=c.height;
+  const d=g.getImageData(0,0,w,h),a=d.data,n=w*h;
+  let y=new Uint8ClampedArray(n);
+  for(let i=0,j=0;j<n;i+=4,j++)y[j]=0.299*a[i]+0.587*a[i+1]+0.114*a[i+2];
+  const med=new Uint8ClampedArray(n),win=new Uint8Array(9);
+  for(let r=0;r<h;r++)for(let q=0;q<w;q++){
+    let k=0;
+    for(let dr=-1;dr<=1;dr++){const rr=Math.min(h-1,Math.max(0,r+dr));
+      for(let dq=-1;dq<=1;dq++){const qq=Math.min(w-1,Math.max(0,q+dq));win[k++]=y[rr*w+qq];}}
+    win.sort();med[r*w+q]=win[4];
+  }
+  y=med;
+  const hist=new Uint32Array(256);for(let j=0;j<n;j++)hist[y[j]]++;
+  let lo=0,hi=255,acc=0;
+  for(let v=0;v<256;v++){acc+=hist[v];if(acc>n*0.01){lo=v;break;}}
+  acc=0;for(let v=255;v>=0;v--){acc+=hist[v];if(acc>n*0.01){hi=v;break;}}
+  const span=Math.max(1,hi-lo);
+  for(let j=0;j<n;j++)y[j]=(y[j]-lo)*255/span;
+  const integ=new Float64Array((w+1)*(h+1));
+  for(let r=1;r<=h;r++){let row=0;for(let q=1;q<=w;q++){row+=y[(r-1)*w+q-1];integ[r*(w+1)+q]=integ[(r-1)*(w+1)+q]+row;}}
+  const half=Math.max(8,Math.round(Math.max(w,h)/50)),T=0.15;
+  const out=new Uint8Array(n);
+  for(let r=0;r<h;r++){const r1=Math.max(0,r-half),r2=Math.min(h,r+half+1);
+    for(let q=0;q<w;q++){const q1=Math.max(0,q-half),q2=Math.min(w,q+half+1);
+      const sum=integ[r2*(w+1)+q2]-integ[r1*(w+1)+q2]-integ[r2*(w+1)+q1]+integ[r1*(w+1)+q1];
+      out[r*w+q]=y[r*w+q]*(r2-r1)*(q2-q1)<sum*(1-T)?0:255;}}
+  for(let r=1;r<h-1;r++)for(let q=1;q<w-1;q++){const j=r*w+q;if(out[j])continue;
+    let dark=0;for(let dr=-1;dr<=1;dr++)for(let dq=-1;dq<=1;dq++)if(!out[j+dr*w+dq])dark++;
+    if(dark<=2)out[j]=255;}
+  for(let i=0,j=0;j<n;i+=4,j++){a[i]=a[i+1]=a[i+2]=out[j];a[i+3]=255;}
+  g.putImageData(d,0,0);
+  return c;
+}
 function prepImage(file){
   return new Promise((res,rej)=>{
     const img=new Image();
     img.onload=()=>{
-      const scale=img.width<1600?Math.min(2.5,1600/img.width):Math.min(1,3000/img.width);
+      const scale=img.width<1600?Math.min(2.5,1600/img.width):Math.min(1,2000/img.width);
       const c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
-      const g=c.getContext("2d");g.drawImage(img,0,0,c.width,c.height);
-      const d=g.getImageData(0,0,c.width,c.height),a=d.data;
-      for(let i=0;i<a.length;i+=4){const y=0.299*a[i]+0.587*a[i+1]+0.114*a[i+2];a[i]=a[i+1]=a[i+2]=y;}
-      g.putImageData(d,0,0);URL.revokeObjectURL(img.src);res(c);
+      const g=c.getContext("2d");g.fillStyle="#fff";g.fillRect(0,0,c.width,c.height);g.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(img.src);
+      try{res(cleanImage(c));}catch(e){res(c);}
     };
     img.onerror=()=>rej(new Error("image"));
     img.src=URL.createObjectURL(file);
   });
+}
+function ocrText(data){
+  if(Array.isArray(data.lines)&&data.lines.length)
+    return data.lines.filter(l=>l.confidence>=35).map(l=>l.text).join("\n");
+  return data.text||"";
 }
 $("photo").onchange=async e=>{
   const file=e.target.files[0];e.target.value="";if(!file)return;
@@ -354,10 +395,13 @@ $("photo").onchange=async e=>{
         else if(typeof x.progress==="number"&&/load/.test(x.status)){prog.value=x.progress;}
       }});
     }
-    m.textContent="辨識中…";
+    m.textContent="處理照片、過濾雜訊中…";
+    await new Promise(r=>setTimeout(r,30));
     const canvas=await prepImage(file);
-    const {data:{text}}=await ocrWorker.recognize(canvas);
-    const rows=parseTranscript(text);
+    m.textContent="辨識中…";
+    const {data}=await ocrWorker.recognize(canvas);
+    const text=data.text||"";
+    const rows=parseTranscript(ocrText(data));
     $("bulkBox").open=true;
     if(rows.length){
       $("bulk").value=rows.map(r=>`${r.name} ${r.credit} ${r.score}`).join("\n");
