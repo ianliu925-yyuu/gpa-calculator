@@ -126,6 +126,9 @@ footer{margin-top:28px;color:var(--muted);font-size:.85rem;text-align:center}
   <div class="row">
     <label class="btn primary" for="photo">選擇照片</label>
     <input type="file" id="photo" accept="image/*" hidden>
+    <label class="muted">課名用：
+      <select id="nameLang"><option value="zh">中文</option><option value="en">英文</option></select>
+    </label>
     <span class="msg" id="ocrMsg"></span>
   </div>
   <progress id="ocrProg" max="1" value="0" hidden></progress>
@@ -298,19 +301,29 @@ $("scaleTables").innerHTML=Object.values(SCALES).map(s=>{
   return `<div><strong>${s.name}</strong><table class="scale-table"><thead><tr><th>等第</th><th>分數</th><th>績點</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }).join("");
 
-function parseTranscript(text){
-  const SKIP=/平均|總計|合計|小計|排名|名次|GPA|學分數|實得|修習|操行|學號|姓名|系所|班級|頁/i;
+const ZH_RE=/[㐀-鿿](?:[㐀-鿿·\-]|\s?[（(][㐀-鿿IVX0-9]{1,4}[)）])*/g;
+const EN_RE=/[A-Za-z][A-Za-z&'\-]*(?:\s(?:[A-Za-z][A-Za-z&'\-]*|\([A-Za-z0-9]{1,4}\)))*/g;
+const EN_TAG=/^(?:(?:Required|Elective|Compulsory|Optional|Pass|Fail)\s)+|(?:\s(?:Required|Elective|Compulsory|Optional|Pass|Fail))+$/gi;
+function pickNames(line){
+  const zh=(line.match(ZH_RE)||[]).map(t=>t.replace(/\s/g,"").replace(/^(必修?|選修?|通識|必選)+|(必修?|選修?|通識|必選)+$/g,""))
+    .filter(t=>(t.match(/[㐀-鿿]/g)||[]).length>=2);
+  const en=(line.match(EN_RE)||[]).map(t=>t.replace(EN_TAG,"").trim())
+    .filter(t=>(t.match(/[A-Za-z]/g)||[]).length>=3&&!/^[A-Z]{2,6}$/.test(t)&&/[a-z]/.test(t)||/\s/.test(t)&&(t.match(/[A-Za-z]/g)||[]).length>=4);
+  const longest=arr=>arr.sort((x,y)=>y.length-x.length)[0]||"";
+  return {zh:longest(zh),en:longest(en)};
+}
+function parseTranscript(text,lang){
+  const SKIP=/平均|總計|合計|小計|排名|名次|GPA|學分數|實得|修習|操行|學號|姓名|系所|班級|頁|Average|Total|Credits Earned|Student|Name|Rank/i;
   const out=[];
   for(let line of text.split(/\r?\n/)){
-    line=line.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/[．。]/g,".").replace(/[|｜_]/g," ").replace(/(?<=\d)[OoＯ]|[OoＯ](?=\d)/g,"0").replace(/(?<=\d)[lI|]|[lI](?=\d)/g,"1").replace(/[^\u3400-\u9fffA-Za-z0-9.\s()（）\-·]/g," ").replace(/\s+/g," ");
-    const names=(line.match(/[㐀-鿿A-Za-z][㐀-鿿A-Za-z（）()·．\-\s]*[㐀-鿿A-Za-z）)]|[㐀-鿿]/g)||[])
-      .map(s=>s.trim()).filter(s=>/[㐀-鿿]/.test(s)||s.replace(/\s/g,"").length>=3);
-    if(!names.length)continue;
-    const name=names.sort((a,b)=>b.length-a.length)[0].replace(/^(必修?|選修?|通識)\s*|\s*(必修?|選修?|通識)$/g,"").trim();
-    if(!name||SKIP.test(name))continue;
-    const cjk=(name.match(/[\u3400-\u9fff]/g)||[]).length,lat=(name.match(/[A-Za-z]/g)||[]).length;
-    if(cjk<2&&lat<3)continue;
-    const nums=[...line.matchAll(/\d+(?:\.\d+)?/g)].map(m=>parseFloat(m[0])).filter(v=>v<=100);
+    line=line.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248)).replace(/[Ａ-Ｚａ-ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-65248))
+      .replace(/[．。]/g,".").replace(/[|｜_]/g," ").replace(/(?<=\d)[OoＯ]|[OoＯ](?=\d)/g,"0").replace(/(?<=\d)[lI|]|[lI](?=\d)/g,"1")
+      .replace(/[^㐀-鿿A-Za-z0-9.\s()（）\-·&']/g," ").replace(/\s+/g," ")
+      .replace(/([㐀-鿿])\s+(?=[㐀-鿿（(])/g,"$1").replace(/([（(])\s+/g,"$1").replace(/\s+([)）])/g,"$1");
+    const {zh,en}=pickNames(line);
+    const name=lang==="en"?(en||zh):(zh||en);
+    if(!name||SKIP.test(zh+" "+en))continue;
+    const nums=[...line.replace(ZH_RE," ").replace(EN_RE," ").matchAll(/\d+(?:\.\d+)?/g)].map(m=>parseFloat(m[0])).filter(v=>v<=100);
     if(nums.length<2)continue;
     let si=nums.length-1,score=nums[si];
     let ci=-1;
@@ -327,7 +340,19 @@ function parseTranscript(text){
   return out;
 }
 
-let ocrWorker=null;
+let ocrWorker=null,lastOcr=null;
+function fillFromOcr(){
+  if(!lastOcr)return;
+  const m=$("ocrMsg"),rows=parseTranscript(lastOcr.filtered,$("nameLang").value);
+  $("bulkBox").open=true;
+  if(rows.length){
+    $("bulk").value=rows.map(r=>`${r.name} ${r.credit} ${r.score}`).join("\n");
+    m.className="msg ok";m.textContent=`辨識出 ${rows.length} 科，請在下方檢查並修正後按「加入表格」`;
+  }else{
+    $("bulk").value=lastOcr.raw.trim();
+    m.className="msg err";m.textContent="沒有自動抓到科目，已把辨識出的文字放到下方，請手動整理成「課名 學分 分數」";
+  }
+}
 function loadScript(src){return new Promise((res,rej)=>{const sc=document.createElement("script");sc.src=src;sc.onload=res;sc.onerror=()=>rej(new Error("load"));document.head.appendChild(sc);});}
 function cleanImage(c){
   const g=c.getContext("2d"),w=c.width,h=c.height;
@@ -382,6 +407,8 @@ function ocrText(data){
     return data.lines.filter(l=>l.confidence>=35).map(l=>l.text).join("\n");
   return data.text||"";
 }
+try{const nl=localStorage.getItem("gpa-name-lang");if(nl)$("nameLang").value=nl;}catch(e){}
+$("nameLang").onchange=()=>{try{localStorage.setItem("gpa-name-lang",$("nameLang").value);}catch(e){}fillFromOcr();};
 $("photo").onchange=async e=>{
   const file=e.target.files[0];e.target.value="";if(!file)return;
   const m=$("ocrMsg"),prog=$("ocrProg");
@@ -394,6 +421,7 @@ $("photo").onchange=async e=>{
         if(x.status==="recognizing text"){prog.value=x.progress;m.textContent="辨識中… "+Math.round(x.progress*100)+"%";}
         else if(typeof x.progress==="number"&&/load/.test(x.status)){prog.value=x.progress;}
       }});
+      await ocrWorker.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"});
     }
     m.textContent="處理照片、過濾雜訊中…";
     await new Promise(r=>setTimeout(r,30));
@@ -401,15 +429,8 @@ $("photo").onchange=async e=>{
     m.textContent="辨識中…";
     const {data}=await ocrWorker.recognize(canvas);
     const text=data.text||"";
-    const rows=parseTranscript(ocrText(data));
-    $("bulkBox").open=true;
-    if(rows.length){
-      $("bulk").value=rows.map(r=>`${r.name} ${r.credit} ${r.score}`).join("\n");
-      m.className="msg ok";m.textContent=`辨識出 ${rows.length} 科，請在下方檢查並修正後按「加入表格」`;
-    }else{
-      $("bulk").value=text.trim();
-      m.className="msg err";m.textContent="沒有自動抓到科目，已把辨識出的文字放到下方，請手動整理成「課名 學分 分數」";
-    }
+    lastOcr={raw:text,filtered:ocrText(data)};
+    fillFromOcr();
     $("bulkBox").scrollIntoView({behavior:"smooth",block:"start"});
   }catch(err){
     m.className="msg err";
